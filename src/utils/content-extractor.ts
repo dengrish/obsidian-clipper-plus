@@ -141,8 +141,15 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	const pdfResult = await extractPdfContent(arrayBuffer);
 	const text = pdfResult.text || '';
 
+	// Wrap text in HTML paragraphs so createMarkdownContent can process it
+	const contentHtml = text
+		.split('\n\n')
+		.filter(Boolean)
+		.map(p => `<p>${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
+		.join('\n');
+
 	return {
-		content: text,
+		content: contentHtml,
 		selectedHtml: '',
 		extractedContent: {
 			isPdf: 'true',
@@ -150,7 +157,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 			pdfText: text,
 		},
 		schemaOrgData: null,
-		fullHtml: text,
+		fullHtml: contentHtml,
 		highlights: [],
 		title: pdfResult.metadata?.title || filenameFromUrl(url),
 		author: pdfResult.metadata?.author || '',
