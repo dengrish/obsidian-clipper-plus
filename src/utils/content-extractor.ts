@@ -140,13 +140,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	const pdfResult = await extractPdfContent(arrayBuffer);
 	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
 	const text = pdfResult.text || '';
-
-	// Wrap text in HTML paragraphs so createMarkdownContent can process it
-	const contentHtml = text
-		.split('\n\n')
-		.filter(Boolean)
-		.map(p => `<p>${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
-		.join('\n');
+	const contentHtml = pdfResult.html || '';
 
 	return {
 		content: contentHtml,
