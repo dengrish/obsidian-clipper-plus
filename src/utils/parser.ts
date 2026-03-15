@@ -269,29 +269,19 @@ function parseVariable(state: ParserState): VariableNode | null {
 		return null;
 	}
 
-	// Check for multiple consecutive identifiers (likely a prompt without quotes)
-	// e.g., {{a summary of the page}} instead of {{"a summary of the page"}}
-	if (check(state, 'identifier')) {
-		// Count how many identifiers follow
-		let extraWords = 0;
-		const savedPos = state.pos;
-		while (check(state, 'identifier') && extraWords < 10) {
-			advance(state);
-			extraWords++;
-		}
-		// Reset position
-		state.pos = savedPos;
-
-		if (extraWords > 0) {
-			state.errors.push({
-				message: 'Unknown variable. If this is a prompt, wrap it in quotes: {{"your prompt here"}}',
-				line: startToken.line,
-				column: startToken.column,
-			});
-			// Skip to end of variable to avoid cascading errors
-			skipToEndOfVariable(state);
-			return null;
-		}
+	// Check for unexpected tokens after the expression (likely an unquoted prompt)
+	// e.g., {{a summary of the page}} or {{identify the speaker(s) or narrator}}
+	// Words like "or", "not" become operators, and "(", ")" become punctuation,
+	// so we can't just check for consecutive identifiers.
+	if (!check(state, 'variable_end') && !check(state, 'pipe') && !check(state, 'eof')) {
+		state.errors.push({
+			message: 'Unknown variable. If this is a prompt, wrap it in quotes: {{"your prompt here"}}',
+			line: startToken.line,
+			column: startToken.column,
+		});
+		// Skip to end of variable to avoid cascading errors
+		skipToEndOfVariable(state);
+		return null;
 	}
 
 	// Consume variable_end
@@ -299,7 +289,7 @@ function parseVariable(state: ParserState): VariableNode | null {
 	if (check(state, 'variable_end')) {
 		const endToken = advance(state);
 		trimRight = endToken.trimRight || false;
-	} else {
+	} else if (!check(state, 'pipe')) {
 		state.errors.push({
 			message: 'Missing closing }}',
 			line: peek(state).line,
