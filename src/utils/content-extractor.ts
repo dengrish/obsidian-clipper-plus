@@ -125,16 +125,20 @@ function getDomain(url: string): string {
 }
 
 async function extractPdfPageContent(url: string): Promise<ContentResponse> {
-	const result = await browser.runtime.sendMessage({
-		action: "extractPdfContent",
+	// Fetch the PDF via the background script (handles cookies/CORS)
+	const fetchResult = await browser.runtime.sendMessage({
+		action: "fetchPdfData",
 		url: url,
-	}) as { success: boolean; data?: any; error?: string };
+	}) as { success: boolean; data?: number[]; error?: string };
 
-	if (!result.success || !result.data) {
-		throw new Error(result.error || 'Failed to extract PDF content');
+	if (!fetchResult.success || !fetchResult.data) {
+		throw new Error(fetchResult.error || 'Failed to fetch PDF');
 	}
 
-	const pdfResult = result.data;
+	// Run pdf.js extraction in popup context (has DOM access)
+	const { extractPdfContent } = await import('./pdf-extractor');
+	const arrayBuffer = new Uint8Array(fetchResult.data).buffer;
+	const pdfResult = await extractPdfContent(arrayBuffer);
 	const text = pdfResult.text || '';
 
 	return {

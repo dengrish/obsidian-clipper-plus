@@ -379,7 +379,7 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
-		if (typedRequest.action === "extractPdfContent") {
+		if (typedRequest.action === "fetchPdfData") {
 			const url = (typedRequest as any).url;
 			if (url) {
 				(async () => {
@@ -395,11 +395,10 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 							return;
 						}
 						const arrayBuffer = await response.arrayBuffer();
-						const { extractPdfContent } = await import('./utils/pdf-extractor');
-						const result = await extractPdfContent(arrayBuffer);
-						sendResponse({ success: true, data: result });
+						// Send as plain number array (ArrayBuffer can't be sent via messaging)
+						sendResponse({ success: true, data: Array.from(new Uint8Array(arrayBuffer)) });
 					} catch (error) {
-						console.error('Error extracting PDF content:', error);
+						console.error('Error fetching PDF:', error);
 						sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
 					}
 				})();
