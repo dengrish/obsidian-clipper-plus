@@ -384,9 +384,14 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			if (url) {
 				(async () => {
 					try {
-						const response = await fetch(url);
+						const response = await fetch(url, { credentials: 'include' });
 						if (!response.ok) {
 							sendResponse({ success: false, error: `Failed to fetch PDF: ${response.status}` });
+							return;
+						}
+						const contentType = response.headers.get('content-type') || '';
+						if (!contentType.includes('application/pdf') && !contentType.includes('application/octet-stream')) {
+							sendResponse({ success: false, error: `URL did not return a PDF (content-type: ${contentType})` });
 							return;
 						}
 						const arrayBuffer = await response.arrayBuffer();
