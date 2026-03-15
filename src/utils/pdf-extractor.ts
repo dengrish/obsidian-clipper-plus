@@ -17,6 +17,42 @@ export interface PdfExtractionResult {
 	};
 }
 
+interface TextItemWithFont {
+	str: string;
+	hasEOL: boolean;
+	fontSize: number;
+	fontName: string;
+}
+
+// Detect the body font size (most common size in the document)
+function detectBodyFontSize(allItems: TextItemWithFont[]): number {
+	const sizeCounts = new Map<number, number>();
+	for (const item of allItems) {
+		if (item.str.trim().length === 0) continue;
+		const rounded = Math.round(item.fontSize * 10) / 10;
+		sizeCounts.set(rounded, (sizeCounts.get(rounded) || 0) + item.str.length);
+	}
+
+	let bodySize = 10;
+	let maxCount = 0;
+	for (const [size, count] of sizeCounts) {
+		if (count > maxCount) {
+			maxCount = count;
+			bodySize = size;
+		}
+	}
+	return bodySize;
+}
+
+// Determine heading level based on font size relative to body text
+function getHeadingLevel(fontSize: number, bodyFontSize: number): number {
+	const ratio = fontSize / bodyFontSize;
+	if (ratio >= 1.6) return 1;  // ## (h1 reserved for document title)
+	if (ratio >= 1.3) return 2;  // ###
+	if (ratio >= 1.1) return 3;  // ####
+	return 0; // not a heading
+}
+
 export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtractionResult> {
 	const doc = await pdfjsLib.getDocument({
 		data: pdfData,
@@ -26,16 +62,88 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 
 	const pageCount = doc.numPages;
 	const pagesToProcess = Math.min(pageCount, MAX_PAGES);
-	const pageTextParts: string[] = [];
+
+	// First pass: collect all text items with font size info
+	const allPageItems: TextItemWithFont[][] = [];
 
 	for (let i = 1; i <= pagesToProcess; i++) {
 		const page = await doc.getPage(i);
 		const textContent = await page.getTextContent();
-		const pageText = textContent.items
-			.filter((item: any) => 'str' in item)
-			.map((item: any) => item.str + (item.hasEOL ? '\n' : ''))
-			.join('');
-		pageTextParts.push(pageText);
+		const pageItems: TextItemWithFont[] = [];
+
+		for (const item of textContent.items) {
+			if (!('str' in item)) continue;
+			const typedItem = item as any;
+			// Font size is encoded in the transform matrix: [scaleX, skewX, skewY, scaleY, translateX, translateY]
+			// The vertical scale (index 3) gives us the font size in PDF points
+			const fontSize = Math.abs(typedItem.transform?.[3] || typedItem.height || 0);
+			pageItems.push({
+				str: typedItem.str,
+				hasEOL: typedItem.hasEOL || false,
+				fontSize,
+				fontName: typedItem.fontName || '',
+			});
+		}
+
+		allPageItems.push(pageItems);
+	}
+
+	const allItems = allPageItems.flat();
+	const bodyFontSize = detectBodyFontSize(allItems);
+
+	// Second pass: build text with markdown heading markers
+	const pageTextParts: string[] = [];
+
+	for (const pageItems of allPageItems) {
+		const parts: string[] = [];
+		let lineBuffer = '';
+		let lineHeadingLevel = 0;
+		let lineCharCount = 0;
+
+		for (const item of pageItems) {
+			const text = item.str;
+			const headingLevel = text.trim().length > 0
+				? getHeadingLevel(item.fontSize, bodyFontSize)
+				: 0;
+
+			// Accumulate text for the current line
+			if (text.trim().length > 0) {
+				if (headingLevel > 0 && lineCharCount === 0) {
+					lineHeadingLevel = headingLevel;
+				} else if (headingLevel !== lineHeadingLevel) {
+					// Mixed sizes on same line — use the larger heading level if most text is heading-sized
+					lineHeadingLevel = 0;
+				}
+				lineCharCount += text.length;
+			}
+
+			lineBuffer += text;
+
+			if (item.hasEOL) {
+				const trimmedLine = lineBuffer.trim();
+				if (trimmedLine.length > 0 && lineHeadingLevel > 0 && trimmedLine.length < 200) {
+					// Short line with larger font → likely a heading
+					parts.push(`${'#'.repeat(lineHeadingLevel + 1)} ${trimmedLine}`);
+				} else {
+					parts.push(lineBuffer);
+				}
+				lineBuffer = '';
+				lineHeadingLevel = 0;
+				lineCharCount = 0;
+			}
+		}
+
+		// Flush remaining buffer
+		if (lineBuffer.length > 0) {
+			const trimmedLine = lineBuffer.trim();
+			if (trimmedLine.length > 0 && lineHeadingLevel > 0 && trimmedLine.length < 200) {
+				parts.push(`${'#'.repeat(lineHeadingLevel + 1)} ${trimmedLine}`);
+			} else {
+				parts.push(lineBuffer);
+			}
+		}
+
+		pageTextParts.push(parts.join(''));
 	}
 
 	const metadataObj = await doc.getMetadata();
