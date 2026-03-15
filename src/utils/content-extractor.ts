@@ -202,10 +202,6 @@ export async function initializePageContent(
 
 		const markdownBody = createMarkdownContent(content, currentUrl);
 
-		// For PDFs, don't include article content in the note — only metadata and LLM summaries.
-		// The LLM can still access the text via {{fullHtml}} and {{pdfText}}.
-		const isPdf = extractedContent?.isPdf === 'true';
-
 		// Convert each highlight to markdown individually
 		const highlightsData = highlights.map(highlight => {
 			const highlightData: {
@@ -229,8 +225,8 @@ export async function initializePageContent(
 		const currentVariables = buildVariables({
 			title,
 			author,
-			content: isPdf ? '' : markdownBody,
-			contentHtml: isPdf ? '' : content,
+			content: markdownBody,
+			contentHtml: content,
 			url: currentUrl,
 			fullHtml,
 			description,
