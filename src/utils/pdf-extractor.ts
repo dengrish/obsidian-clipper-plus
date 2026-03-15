@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Disable worker since we run in a service worker context (can't spawn nested workers)
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+// Point to the bundled worker file in the extension directory
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
 
 const MAX_PAGES = 100;
 
