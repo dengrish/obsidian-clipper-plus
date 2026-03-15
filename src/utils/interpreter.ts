@@ -138,6 +138,24 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 				temperature: 0.5,
 				stream: false
 			};
+		} else if (provider.name.toLowerCase().includes('gemini') || provider.baseUrl.includes('generativelanguage.googleapis.com')) {
+			// Google Gemini via OpenAI-compatible endpoint
+			// Gemini models support up to 65536 output tokens; thinking models
+			// consume output tokens for internal reasoning, so we set a high limit
+			requestUrl = provider.baseUrl;
+			requestBody = {
+				model: model.providerModelId,
+				messages: [
+					{ role: 'system', content: systemContent },
+					{ role: 'user', content: `${promptContext}` },
+					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
+				],
+				max_tokens: 65536
+			};
+			headers = {
+				...headers,
+				'Authorization': `Bearer ${provider.apiKey}`
+			};
 		} else {
 			// Default request format (OpenAI-compatible)
 			requestUrl = provider.baseUrl;
@@ -193,6 +211,13 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 		}
 
 		debugLog('Interpreter', `Parsed ${provider.name} response:`, data);
+
+		// Log finish reason to detect output truncation
+		const finishReason = data.choices?.[0]?.finish_reason || data.stop_reason || 'unknown';
+		if (finishReason === 'length' || finishReason === 'max_tokens') {
+			console.warn(`[Interpreter] Response was truncated (finish_reason: ${finishReason}). The output may be incomplete. Consider using a model with a higher output token limit.`);
+		}
+		debugLog('Interpreter', `Finish reason: ${finishReason}`);
 
 		lastRequestTime = now;
 
