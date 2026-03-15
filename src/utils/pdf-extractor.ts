@@ -1,7 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import browser from './browser-polyfill';
 
-// Point to the bundled worker file in the extension directory
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+// Use the full chrome-extension:// URL for the worker file
+pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL('pdf.worker.min.mjs');
 
 const MAX_PAGES = 100;
 
