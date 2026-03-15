@@ -60,9 +60,8 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
 				],
-				max_tokens: 1600,
 				stream: false
-			};					
+			};
 			headers = {
 				...headers,
 				'Authorization': `Bearer ${provider.apiKey}`
@@ -75,7 +74,6 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
 				],
-				max_tokens: 1600,
 				stream: false
 			};
 			headers = {
@@ -86,7 +84,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 			requestUrl = provider.baseUrl;
 			requestBody = {
 				model: model.providerModelId,
-				max_tokens: 1600,
+				max_tokens: 16384,
 				messages: [
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
@@ -104,7 +102,6 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 			requestUrl = provider.baseUrl;
 			requestBody = {
 				model: model.providerModelId,
-				max_tokens: 1600,
 				messages: [
 					{ role: 'system', content: systemContent },
 					{ role: 'user', content: `
