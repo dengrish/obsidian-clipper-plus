@@ -12,6 +12,7 @@ const MIN_IMAGE_PIXELS = 30 * 30;
 export interface PdfExtractionResult {
 	html: string;
 	text: string;
+	images: string[];
 	pageCount: number;
 	metadata: {
 		title: string;
@@ -352,25 +353,22 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 	// Second pass: build structured HTML and extract images per page
 	const pageHtmlParts: string[] = [];
 	const pageTextParts: string[] = [];
+	const allImages: string[] = [];
 
 	for (let i = 0; i < pagesToProcess; i++) {
 		const lines = groupIntoLines(allPageItems[i]);
 		const textHtml = linesToHtml(lines, fontAnalysis);
 		const plainText = lines.map(l => l.text).join('\n');
 
-		// Extract images from page
-		let imageHtml = '';
+		// Extract images separately (not in HTML, since Defuddle strips data URIs)
 		try {
 			const images = await extractPageImages(pages[i]);
-			if (images.length > 0) {
-				imageHtml = images.map(uri => `<img src="${uri}" />`).join('\n');
-			}
+			allImages.push(...images);
 		} catch (e) {
 			console.warn('[PDF Clipper] Image extraction failed for page', i + 1, e);
 		}
 
-		const pageHtml = textHtml + (imageHtml ? '\n' + imageHtml : '');
-		pageHtmlParts.push(pageHtml);
+		pageHtmlParts.push(textHtml);
 		pageTextParts.push(plainText);
 	}
 
@@ -381,6 +379,7 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 	return {
 		html: pageHtmlParts.join('\n<hr />\n'),
 		text: pageTextParts.join('\n\n'),
+		images: allImages,
 		pageCount,
 		metadata: {
 			title: info.Title || '',

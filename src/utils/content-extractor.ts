@@ -138,7 +138,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	console.log('[PDF Clipper] PDF size:', arrayBuffer.byteLength, 'bytes');
 
 	const pdfResult = await extractPdfContent(arrayBuffer);
-	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
+	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount, 'images:', pdfResult.images.length);
 	const text = pdfResult.text || '';
 	const contentHtml = pdfResult.html || '';
 
@@ -149,6 +149,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 			isPdf: 'true',
 			pdfPageCount: String(pdfResult.pageCount || 0),
 			pdfText: text,
+			pdfImages: pdfResult.images.length > 0 ? JSON.stringify(pdfResult.images) : '',
 		},
 		schemaOrgData: null,
 		fullHtml: contentHtml,
@@ -201,7 +202,22 @@ export async function initializePageContent(
 			content = processHighlights(content, highlights);
 		}
 
-		const markdownBody = createMarkdownContent(content, currentUrl);
+		let markdownBody = createMarkdownContent(content, currentUrl);
+
+		// Append PDF images as markdown (bypassing Defuddle which strips data URIs)
+		if (extractedContent?.pdfImages) {
+			try {
+				const images: string[] = JSON.parse(extractedContent.pdfImages);
+				if (images.length > 0) {
+					const imageMarkdown = images
+						.map((uri, i) => `![PDF image ${i + 1}](${uri})`)
+						.join('\n\n');
+					markdownBody += '\n\n' + imageMarkdown;
+				}
+			} catch (e) {
+				console.warn('[PDF Clipper] Failed to parse PDF images:', e);
+			}
+		}
 
 		// Convert each highlight to markdown individually
 		const highlightsData = highlights.map(highlight => {
