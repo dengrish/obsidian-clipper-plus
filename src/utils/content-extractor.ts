@@ -146,16 +146,8 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
 	const text = pdfResult.text || '';
 
-	// Wrap PDF text in HTML paragraphs so createMarkdownContent can process it
-	// and {{content}} is populated for templates and LLM prompt context
-	const contentHtml = text
-		.split('\n\n')
-		.filter(p => p.trim())
-		.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
-		.join('\n');
-
 	return {
-		content: contentHtml,
+		content: text,
 		selectedHtml: '',
 		extractedContent: {
 			isPdf: 'true',
@@ -163,9 +155,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 			pdfText: text,
 		},
 		schemaOrgData: null,
-		// HTML-escape the plain text so that HTML filters (remove_html, strip_tags)
-		// don't interpret angle brackets in PDF text (e.g. math "x < 5") as tags
-		fullHtml: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+		fullHtml: text,
 		highlights: [],
 		title: pdfResult.metadata?.title || filenameFromUrl(url),
 		author: pdfResult.metadata?.author || '',
@@ -215,7 +205,9 @@ export async function initializePageContent(
 			content = processHighlights(content, highlights);
 		}
 
-		const markdownBody = createMarkdownContent(content, currentUrl);
+		// For PDFs, content is already plain text — no HTML-to-markdown conversion needed
+		const isPdf = extractedContent?.isPdf === 'true';
+		const markdownBody = isPdf ? content : createMarkdownContent(content, currentUrl);
 
 		// Convert each highlight to markdown individually
 		const highlightsData = highlights.map(highlight => {
