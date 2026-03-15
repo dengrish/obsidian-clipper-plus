@@ -51,6 +51,8 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 			'Content-Type': 'application/json',
 		};
 
+		const maxOutputTokens = 16384;
+
 		if (provider.name.toLowerCase().includes('hugging')) {
 			// Replace {model-id} in baseUrl with the actual model ID
 			requestUrl = provider.baseUrl.replace('{model-id}', model.providerModelId);
@@ -61,6 +63,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
 				],
+				max_tokens: maxOutputTokens,
 				stream: false
 			};
 			headers = {
@@ -75,6 +78,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
 				],
+				max_tokens: maxOutputTokens,
 				stream: false
 			};
 			headers = {
@@ -85,7 +89,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 			requestUrl = provider.baseUrl;
 			requestBody = {
 				model: model.providerModelId,
-				max_tokens: 16384,
+				max_tokens: maxOutputTokens,
 				messages: [
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
@@ -110,6 +114,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 						"${JSON.stringify(promptContent)}"`
 					}
 				],
+				max_tokens: maxOutputTokens,
 				temperature: 0.3
 			};
 			headers = {
@@ -129,11 +134,12 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 				],
 				format: 'json',
 				num_ctx: 120000,
+				num_predict: maxOutputTokens,
 				temperature: 0.5,
 				stream: false
 			};
 		} else {
-			// Default request format
+			// Default request format (OpenAI-compatible)
 			requestUrl = provider.baseUrl;
 			requestBody = {
 				model: model.providerModelId,
@@ -141,7 +147,8 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'system', content: systemContent },
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
-				]
+				],
+				max_tokens: maxOutputTokens
 			};
 			headers = {
 				...headers,
