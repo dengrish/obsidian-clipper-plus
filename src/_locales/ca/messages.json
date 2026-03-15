@@ -274,7 +274,7 @@
 		"message": "Guardar contingut web en un format privat i durador al qual pot accedir sense connexió. L'extensió oficial per a Obsidian."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Obsidian Web Clipper Plus"
 	},
 	"failedToCopyText": {
 		"message": "Error en copiar el text"

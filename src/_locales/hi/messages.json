@@ -274,7 +274,7 @@
 		"message": "Web se content ko ek private aur durable format mein save karein jise aap offline access kar sakte hain. Obsidian ka official browser extension."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Obsidian Web Clipper Plus"
 	},
 	"failedToCopyText": {
 		"message": "Text copy karne mein fail"
