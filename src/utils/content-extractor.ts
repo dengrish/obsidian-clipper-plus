@@ -1,6 +1,6 @@
 import { ExtractedContent } from '../types/types';
 import { createMarkdownContent } from 'defuddle/full';
-import { sanitizeFileName } from './string-utils';
+import { sanitizeFileName, getDomain } from './string-utils';
 import { buildVariables, addSchemaOrgDataToVariables } from './shared';
 import browser from './browser-polyfill';
 import { debugLog } from './debug';
@@ -114,14 +114,6 @@ function filenameFromUrl(url: string): string {
 		return decodeURIComponent(filename.replace(/\.pdf$/i, ''));
 	} catch {
 		return 'PDF Document';
-	}
-}
-
-function getDomain(url: string): string {
-	try {
-		return new URL(url).hostname;
-	} catch {
-		return '';
 	}
 }
 

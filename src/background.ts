@@ -379,51 +379,6 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
-		if (typedRequest.action === "fetchPdfData") {
-			const url = (typedRequest as any).url;
-			if (url) {
-				(async () => {
-					try {
-						const response = await fetch(url, { credentials: 'include' });
-						if (!response.ok) {
-							sendResponse({ success: false, error: `Failed to fetch PDF: ${response.status}` });
-							return;
-						}
-						const contentType = response.headers.get('content-type') || '';
-						if (!contentType.includes('application/pdf') && !contentType.includes('application/octet-stream')) {
-							sendResponse({ success: false, error: `URL did not return a PDF (content-type: ${contentType})` });
-							return;
-						}
-						const arrayBuffer = await response.arrayBuffer();
-						// Send as plain number array (ArrayBuffer can't be sent via messaging)
-						sendResponse({ success: true, data: Array.from(new Uint8Array(arrayBuffer)) });
-					} catch (error) {
-						console.error('Error fetching PDF:', error);
-						sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
-					}
-				})();
-				return true;
-			} else {
-				sendResponse({ success: false, error: 'Missing URL' });
-				return true;
-			}
-		}
-
-		if (typedRequest.action === "checkContentType") {
-			const url = (typedRequest as any).url;
-			if (url) {
-				fetch(url, { method: 'HEAD' }).then((response) => {
-					sendResponse({ success: true, contentType: response.headers.get('content-type') || '' });
-				}).catch((error) => {
-					sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
-				});
-				return true;
-			} else {
-				sendResponse({ success: false, error: 'Missing URL' });
-				return true;
-			}
-		}
-
 		if (typedRequest.action === "sendMessageToTab") {
 			const tabId = (typedRequest as any).tabId;
 			const message = (typedRequest as any).message;
