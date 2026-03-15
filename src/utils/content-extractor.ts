@@ -63,7 +63,7 @@ interface ContentResponse {
 }
 
 export async function extractPageContent(tabId: number, tabUrl?: string): Promise<ContentResponse | null> {
-	// PDF detection: if URL ends in .pdf, extract via background script
+	// PDF detection: if URL ends in .pdf, extract directly via fetch + pdfjs
 	if (tabUrl && isPdfUrl(tabUrl)) {
 		return extractPdfPageContent(tabUrl);
 	}
@@ -133,8 +133,16 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
 	const text = pdfResult.text || '';
 
+	// Wrap PDF text in HTML paragraphs so createMarkdownContent can process it
+	// and {{content}} is populated for templates and LLM prompt context
+	const contentHtml = text
+		.split('\n\n')
+		.filter(p => p.trim())
+		.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+		.join('\n');
+
 	return {
-		content: '',
+		content: contentHtml,
 		selectedHtml: '',
 		extractedContent: {
 			isPdf: 'true',
