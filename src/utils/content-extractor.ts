@@ -63,9 +63,22 @@ interface ContentResponse {
 }
 
 export async function extractPageContent(tabId: number, tabUrl?: string): Promise<ContentResponse | null> {
-	// PDF detection: if URL ends in .pdf, extract directly via fetch + pdfjs
+	// PDF detection: if URL matches known PDF patterns, extract directly via fetch + pdfjs
 	if (tabUrl && isPdfUrl(tabUrl)) {
 		return extractPdfPageContent(tabUrl);
+	}
+
+	// Content-type fallback: for URLs that don't match patterns but serve PDFs
+	if (tabUrl) {
+		try {
+			const headResponse = await fetch(tabUrl, { method: 'HEAD', credentials: 'include' });
+			const contentType = headResponse.headers.get('content-type') || '';
+			if (contentType.includes('application/pdf')) {
+				return extractPdfPageContent(tabUrl);
+			}
+		} catch {
+			// HEAD request failed, proceed with normal extraction
+		}
 	}
 
 	try {
