@@ -140,10 +140,9 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 	const pdfResult = await extractPdfContent(arrayBuffer);
 	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
 	const text = pdfResult.text || '';
-	const contentHtml = pdfResult.html || '';
 
 	return {
-		content: contentHtml,
+		content: '',
 		selectedHtml: '',
 		extractedContent: {
 			isPdf: 'true',
@@ -151,7 +150,7 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 			pdfText: text,
 		},
 		schemaOrgData: null,
-		fullHtml: contentHtml,
+		fullHtml: text,
 		highlights: [],
 		title: pdfResult.metadata?.title || filenameFromUrl(url),
 		author: pdfResult.metadata?.author || '',
