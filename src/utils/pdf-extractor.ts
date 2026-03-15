@@ -5,14 +5,10 @@ import browser from './browser-polyfill';
 pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL('pdf.worker.min.mjs');
 
 const MAX_PAGES = 100;
-const MAX_IMAGES_PER_PAGE = 10;
-const MAX_IMAGE_PIXELS = 2000 * 2000;
-const MIN_IMAGE_PIXELS = 30 * 30;
 
 export interface PdfExtractionResult {
 	html: string;
 	text: string;
-	images: string[];
 	pageCount: number;
 	metadata: {
 		title: string;
@@ -231,88 +227,6 @@ function linesToHtml(lines: TextLine[], fontAnalysis: FontAnalysis): string {
 	return html.join('\n');
 }
 
-function getPageObject(page: any, name: string): Promise<any> {
-	return new Promise((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error('Image load timeout')), 5000);
-		try {
-			page.objs.get(name, (data: any) => {
-				clearTimeout(timeout);
-				resolve(data);
-			});
-		} catch (e) {
-			clearTimeout(timeout);
-			reject(e);
-		}
-	});
-}
-
-async function extractPageImages(page: any): Promise<string[]> {
-	const ops = await page.getOperatorList();
-	const images: string[] = [];
-	const seenImages = new Set<string>();
-
-	for (let i = 0; i < ops.fnArray.length && images.length < MAX_IMAGES_PER_PAGE; i++) {
-		if (ops.fnArray[i] !== pdfjsLib.OPS.paintImageXObject) continue;
-
-		const imageName = ops.argsArray[i][0];
-		if (seenImages.has(imageName)) continue;
-		seenImages.add(imageName);
-
-		try {
-			const imgData = await getPageObject(page, imageName);
-			if (!imgData) continue;
-
-			// Handle ImageBitmap (newer pdfjs versions)
-			if (typeof ImageBitmap !== 'undefined' && imgData instanceof ImageBitmap) {
-				const { width, height } = imgData;
-				if (width * height > MAX_IMAGE_PIXELS || width * height < MIN_IMAGE_PIXELS) continue;
-
-				const canvas = document.createElement('canvas');
-				canvas.width = width;
-				canvas.height = height;
-				const ctx = canvas.getContext('2d')!;
-				ctx.drawImage(imgData, 0, 0);
-				images.push(canvas.toDataURL('image/jpeg', 0.85));
-				continue;
-			}
-
-			// Handle raw pixel data
-			const { width, height, kind, data } = imgData;
-			if (!data || !width || !height) continue;
-			if (width * height > MAX_IMAGE_PIXELS || width * height < MIN_IMAGE_PIXELS) continue;
-
-			const canvas = document.createElement('canvas');
-			canvas.width = width;
-			canvas.height = height;
-			const ctx = canvas.getContext('2d')!;
-			const imageData = ctx.createImageData(width, height);
-
-			if (kind === 2) {
-				// RGB_24BPP
-				for (let j = 0; j < width * height; j++) {
-					imageData.data[j * 4] = data[j * 3];
-					imageData.data[j * 4 + 1] = data[j * 3 + 1];
-					imageData.data[j * 4 + 2] = data[j * 3 + 2];
-					imageData.data[j * 4 + 3] = 255;
-				}
-			} else if (kind === 3) {
-				// RGBA_32BPP
-				imageData.data.set(data);
-			} else {
-				// Skip unsupported kinds (1BPP masks, etc.)
-				continue;
-			}
-
-			ctx.putImageData(imageData, 0, 0);
-			images.push(canvas.toDataURL('image/jpeg', 0.85));
-		} catch (e) {
-			console.warn('[PDF Clipper] Failed to extract image:', imageName, e);
-		}
-	}
-
-	return images;
-}
-
 export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtractionResult> {
 	const doc = await pdfjsLib.getDocument({
 		data: pdfData,
@@ -350,23 +264,14 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 
 	const fontAnalysis = analyzeFontSizes(allItems);
 
-	// Second pass: build structured HTML and extract images per page
+	// Second pass: build structured HTML
 	const pageHtmlParts: string[] = [];
 	const pageTextParts: string[] = [];
-	const allImages: string[] = [];
 
 	for (let i = 0; i < pagesToProcess; i++) {
 		const lines = groupIntoLines(allPageItems[i]);
 		const textHtml = linesToHtml(lines, fontAnalysis);
 		const plainText = lines.map(l => l.text).join('\n');
-
-		// Extract images separately (not in HTML, since Defuddle strips data URIs)
-		try {
-			const images = await extractPageImages(pages[i]);
-			allImages.push(...images);
-		} catch (e) {
-			console.warn('[PDF Clipper] Image extraction failed for page', i + 1, e);
-		}
 
 		pageHtmlParts.push(textHtml);
 		pageTextParts.push(plainText);
@@ -379,7 +284,6 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 	return {
 		html: pageHtmlParts.join('\n<hr />\n'),
 		text: pageTextParts.join('\n\n'),
-		images: allImages,
 		pageCount,
 		metadata: {
 			title: info.Title || '',
