@@ -444,10 +444,16 @@ export async function initializeInterpreter(template: Template, variables: { [ke
 		
 		storeListener(promptContextTextarea, 'input', inputListener);
 
+		const defaultHtmlContext = '{{fullHtml|remove_html:("#navbar,.footer,#footer,header,footer,style,script")|strip_tags:("script,h1,h2,h3,h4,h5,h6,meta,a,ol,ul,li,p,em,strong,i,b,s,strike,u,sup,sub,img,video,audio,math,table,cite,td,th,tr,caption")|strip_attr:("alt,src,href,id,content,property,name,datetime,title")}}';
+		// For PDFs, use pdfText directly — HTML filters corrupt plain text
+		// containing angle brackets (e.g. math expressions like "x < 5")
+		const defaultPdfContext = '{{pdfText}}';
+		const isPdf = variables['isPdf'] === 'true';
+
 		let promptToDisplay =
 			template.context
 			|| generalSettings.defaultPromptContext
-			|| '{{fullHtml|remove_html:("#navbar,.footer,#footer,header,footer,style,script")|strip_tags:("script,h1,h2,h3,h4,h5,h6,meta,a,ol,ul,li,p,em,strong,i,b,s,strike,u,sup,sub,img,video,audio,math,table,cite,td,th,tr,caption")|strip_attr:("alt,src,href,id,content,property,name,datetime,title")}}';
+			|| (isPdf ? defaultPdfContext : defaultHtmlContext);
 		promptToDisplay = await compileTemplate(tabId, promptToDisplay, variables, currentUrl);
 		promptContextTextarea.value = promptToDisplay;
 		

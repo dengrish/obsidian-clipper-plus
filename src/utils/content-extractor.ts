@@ -163,7 +163,9 @@ async function extractPdfPageContent(url: string): Promise<ContentResponse> {
 			pdfText: text,
 		},
 		schemaOrgData: null,
-		fullHtml: text,
+		// HTML-escape the plain text so that HTML filters (remove_html, strip_tags)
+		// don't interpret angle brackets in PDF text (e.g. math "x < 5") as tags
+		fullHtml: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
 		highlights: [],
 		title: pdfResult.metadata?.title || filenameFromUrl(url),
 		author: pdfResult.metadata?.author || '',
