@@ -13,6 +13,7 @@ import {
 	wrapTextWithMark
 } from './dom-utils';
 import { isPdfUrl } from './active-tab-manager';
+import { extractPdfContent } from './pdf-extractor';
 
 // Define ElementHighlightData type inline since it's not exported from highlighter.ts
 interface ElementHighlightData extends HighlightData {
@@ -125,20 +126,19 @@ function getDomain(url: string): string {
 }
 
 async function extractPdfPageContent(url: string): Promise<ContentResponse> {
-	// Fetch the PDF via the background script (handles cookies/CORS)
-	const fetchResult = await browser.runtime.sendMessage({
-		action: "fetchPdfData",
-		url: url,
-	}) as { success: boolean; data?: number[]; error?: string };
-
-	if (!fetchResult.success || !fetchResult.data) {
-		throw new Error(fetchResult.error || 'Failed to fetch PDF');
+	// Fetch and extract PDF directly in popup context (has DOM + host permissions)
+	console.log('[PDF Clipper] Fetching PDF from:', url);
+	const response = await fetch(url, { credentials: 'include' });
+	if (!response.ok) {
+		throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
 	}
+	console.log('[PDF Clipper] PDF fetched, content-type:', response.headers.get('content-type'));
 
-	// Run pdf.js extraction in popup context (has DOM access)
-	const { extractPdfContent } = await import('./pdf-extractor');
-	const arrayBuffer = new Uint8Array(fetchResult.data).buffer;
+	const arrayBuffer = await response.arrayBuffer();
+	console.log('[PDF Clipper] PDF size:', arrayBuffer.byteLength, 'bytes');
+
 	const pdfResult = await extractPdfContent(arrayBuffer);
+	console.log('[PDF Clipper] Extracted text length:', pdfResult.text.length, 'pages:', pdfResult.pageCount);
 	const text = pdfResult.text || '';
 
 	// Wrap text in HTML paragraphs so createMarkdownContent can process it
