@@ -379,6 +379,47 @@ browser.runtime.onMessage.addListener((request: unknown, sender: browser.Runtime
 			return true;
 		}
 
+		if (typedRequest.action === "extractPdfContent") {
+			const url = (typedRequest as any).url;
+			if (url) {
+				(async () => {
+					try {
+						const response = await fetch(url);
+						if (!response.ok) {
+							sendResponse({ success: false, error: `Failed to fetch PDF: ${response.status}` });
+							return;
+						}
+						const arrayBuffer = await response.arrayBuffer();
+						const { extractPdfContent } = await import('./utils/pdf-extractor');
+						const result = await extractPdfContent(arrayBuffer);
+						sendResponse({ success: true, data: result });
+					} catch (error) {
+						console.error('Error extracting PDF content:', error);
+						sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+					}
+				})();
+				return true;
+			} else {
+				sendResponse({ success: false, error: 'Missing URL' });
+				return true;
+			}
+		}
+
+		if (typedRequest.action === "checkContentType") {
+			const url = (typedRequest as any).url;
+			if (url) {
+				fetch(url, { method: 'HEAD' }).then((response) => {
+					sendResponse({ success: true, contentType: response.headers.get('content-type') || '' });
+				}).catch((error) => {
+					sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+				});
+				return true;
+			} else {
+				sendResponse({ success: false, error: 'Missing URL' });
+				return true;
+			}
+		}
+
 		if (typedRequest.action === "sendMessageToTab") {
 			const tabId = (typedRequest as any).tabId;
 			const message = (typedRequest as any).message;

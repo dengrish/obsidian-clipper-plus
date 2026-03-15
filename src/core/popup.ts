@@ -103,8 +103,8 @@ async function getCurrentTabInfo(): Promise<{ url: string; title?: string }> {
 // Memoize extractPageContent with URL-sensitive key
 const memoizedExtractPageContent = memoizeWithExpiration(
 	async (tabId: number) => {
-		await getTabInfo(tabId);
-		return extractPageContent(tabId);
+		const tab = await getTabInfo(tabId);
+		return extractPageContent(tabId, tab.url);
 	},
 	{
 		expirationMs: 5000,

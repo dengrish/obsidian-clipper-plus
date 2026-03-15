@@ -12,6 +12,7 @@ import {
 	wrapElementWithMark,
 	wrapTextWithMark
 } from './dom-utils';
+import { isPdfUrl } from './active-tab-manager';
 
 // Define ElementHighlightData type inline since it's not exported from highlighter.ts
 interface ElementHighlightData extends HighlightData {
@@ -60,11 +61,16 @@ interface ContentResponse {
 	metaTags: { name?: string | null; property?: string | null; content: string | null }[];
 }
 
-export async function extractPageContent(tabId: number): Promise<ContentResponse | null> {
+export async function extractPageContent(tabId: number, tabUrl?: string): Promise<ContentResponse | null> {
+	// PDF detection: if URL ends in .pdf, extract via background script
+	if (tabUrl && isPdfUrl(tabUrl)) {
+		return extractPdfPageContent(tabUrl);
+	}
+
 	try {
-		const response = await browser.runtime.sendMessage({ 
-			action: "sendMessageToTab", 
-			tabId: tabId, 
+		const response = await browser.runtime.sendMessage({
+			action: "sendMessageToTab",
+			tabId: tabId,
 			message: { action: "getPageContent" }
 		}) as ContentResponse;
 		if (response && response.content) {
@@ -96,6 +102,65 @@ export async function extractPageContent(tabId: number): Promise<ContentResponse
 		console.error('Error extracting page content:', error);
 		throw error;
 	}
+}
+
+function filenameFromUrl(url: string): string {
+	try {
+		const parsed = new URL(url);
+		const pathname = parsed.pathname;
+		const filename = pathname.split('/').pop() || '';
+		// Remove .pdf extension for use as title
+		return decodeURIComponent(filename.replace(/\.pdf$/i, ''));
+	} catch {
+		return 'PDF Document';
+	}
+}
+
+function getDomain(url: string): string {
+	try {
+		return new URL(url).hostname;
+	} catch {
+		return '';
+	}
+}
+
+async function extractPdfPageContent(url: string): Promise<ContentResponse> {
+	const result = await browser.runtime.sendMessage({
+		action: "extractPdfContent",
+		url: url,
+	}) as { success: boolean; data?: any; error?: string };
+
+	if (!result.success || !result.data) {
+		throw new Error(result.error || 'Failed to extract PDF content');
+	}
+
+	const pdfResult = result.data;
+	const text = pdfResult.text || '';
+
+	return {
+		content: text,
+		selectedHtml: '',
+		extractedContent: {
+			isPdf: 'true',
+			pdfPageCount: String(pdfResult.pageCount || 0),
+			pdfText: text,
+		},
+		schemaOrgData: null,
+		fullHtml: text,
+		highlights: [],
+		title: pdfResult.metadata?.title || filenameFromUrl(url),
+		author: pdfResult.metadata?.author || '',
+		description: pdfResult.metadata?.subject || '',
+		domain: getDomain(url),
+		favicon: '',
+		image: '',
+		parseTime: 0,
+		published: pdfResult.metadata?.creationDate || '',
+		site: '',
+		wordCount: text.split(/\s+/).filter(Boolean).length,
+		language: '',
+		metaTags: [],
+	};
 }
 
 export async function initializePageContent(

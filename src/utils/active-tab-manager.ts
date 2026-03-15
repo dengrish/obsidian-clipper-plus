@@ -27,3 +27,12 @@ export function isValidUrl(url: string): boolean {
 export function isBlankPage(url: string): boolean {
 	return url === 'about:blank' || url === 'chrome://newtab/' || url === 'edge://newtab/';
 }
+
+export function isPdfUrl(url: string): boolean {
+	try {
+		const parsed = new URL(url);
+		return parsed.pathname.toLowerCase().endsWith('.pdf');
+	} catch {
+		return false;
+	}
+}

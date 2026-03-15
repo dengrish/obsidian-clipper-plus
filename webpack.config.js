@@ -51,6 +51,7 @@ module.exports = (env, argv) => {
 		output: {
 			path: path.resolve(__dirname, outputDir),
 			filename: '[name].js',
+			chunkFilename: '[name].chunk.js',
 			module: false,
 		},
 		devtool: isProduction ? false : 'source-map',
