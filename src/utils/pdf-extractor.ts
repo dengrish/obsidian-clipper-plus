@@ -17,7 +17,7 @@ export interface PdfExtractionResult {
 	};
 }
 
-interface TextItemWithFont {
+export interface TextItemWithFont {
 	str: string;
 	hasEOL: boolean;
 	fontSize: number;
@@ -25,7 +25,7 @@ interface TextItemWithFont {
 }
 
 // Detect the body font size (most common size in the document)
-function detectBodyFontSize(allItems: TextItemWithFont[]): number {
+export function detectBodyFontSize(allItems: TextItemWithFont[]): number {
 	const sizeCounts = new Map<number, number>();
 	for (const item of allItems) {
 		if (item.str.trim().length === 0) continue;
@@ -45,7 +45,7 @@ function detectBodyFontSize(allItems: TextItemWithFont[]): number {
 }
 
 // Determine heading level based on font size relative to body text
-function getHeadingLevel(fontSize: number, bodyFontSize: number): number {
+export function getHeadingLevel(fontSize: number, bodyFontSize: number): number {
 	const ratio = fontSize / bodyFontSize;
 	if (ratio >= 1.6) return 1;  // ## (h1 reserved for document title)
 	if (ratio >= 1.3) return 2;  // ###
@@ -97,8 +97,10 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 	for (const pageItems of allPageItems) {
 		const parts: string[] = [];
 		let lineBuffer = '';
-		let lineHeadingLevel = 0;
 		let lineCharCount = 0;
+
+		let headingChars = 0;
+		let bestHeadingLevel = 0;
 
 		for (const item of pageItems) {
 			const text = item.str;
@@ -106,13 +108,14 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 				? getHeadingLevel(item.fontSize, bodyFontSize)
 				: 0;
 
-			// Accumulate text for the current line
+			// Accumulate text for the current line, tracking heading vs body chars
 			if (text.trim().length > 0) {
-				if (headingLevel > 0 && lineCharCount === 0) {
-					lineHeadingLevel = headingLevel;
-				} else if (headingLevel !== lineHeadingLevel) {
-					// Mixed sizes on same line — use the larger heading level if most text is heading-sized
-					lineHeadingLevel = 0;
+				if (headingLevel > 0) {
+					headingChars += text.length;
+					// Keep the strongest (smallest number = largest) heading level seen
+					if (bestHeadingLevel === 0 || headingLevel < bestHeadingLevel) {
+						bestHeadingLevel = headingLevel;
+					}
 				}
 				lineCharCount += text.length;
 			}
@@ -121,23 +124,27 @@ export async function extractPdfContent(pdfData: ArrayBuffer): Promise<PdfExtrac
 
 			if (item.hasEOL) {
 				const trimmedLine = lineBuffer.trim();
-				if (trimmedLine.length > 0 && lineHeadingLevel > 0 && trimmedLine.length < 200) {
+				// Treat as heading if majority of chars are heading-sized
+				const isHeading = bestHeadingLevel > 0 && lineCharCount > 0 && (headingChars / lineCharCount) > 0.5;
+				if (trimmedLine.length > 0 && isHeading && trimmedLine.length < 200) {
 					// Short line with larger font → likely a heading
-					parts.push(`${'#'.repeat(lineHeadingLevel + 1)} ${trimmedLine}`);
+					parts.push(`${'#'.repeat(bestHeadingLevel + 1)} ${trimmedLine}`);
 				} else {
 					parts.push(lineBuffer);
 				}
 				lineBuffer = '';
-				lineHeadingLevel = 0;
 				lineCharCount = 0;
+				headingChars = 0;
+				bestHeadingLevel = 0;
 			}
 		}
 
 		// Flush remaining buffer
 		if (lineBuffer.length > 0) {
 			const trimmedLine = lineBuffer.trim();
-			if (trimmedLine.length > 0 && lineHeadingLevel > 0 && trimmedLine.length < 200) {
-				parts.push(`${'#'.repeat(lineHeadingLevel + 1)} ${trimmedLine}`);
+			const isHeading = bestHeadingLevel > 0 && lineCharCount > 0 && (headingChars / lineCharCount) > 0.5;
+			if (trimmedLine.length > 0 && isHeading && trimmedLine.length < 200) {
+				parts.push(`${'#'.repeat(bestHeadingLevel + 1)} ${trimmedLine}`);
 			} else {
 				parts.push(lineBuffer);
 			}

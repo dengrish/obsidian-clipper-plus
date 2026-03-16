@@ -71,13 +71,16 @@ export async function extractPageContent(tabId: number, tabUrl?: string): Promis
 	// Content-type fallback: for URLs that don't match patterns but serve PDFs
 	if (tabUrl) {
 		try {
-			const headResponse = await fetch(tabUrl, { method: 'HEAD', credentials: 'include' });
+			const headController = new AbortController();
+			const headTimeout = setTimeout(() => headController.abort(), 3000);
+			const headResponse = await fetch(tabUrl, { method: 'HEAD', credentials: 'include', signal: headController.signal });
+			clearTimeout(headTimeout);
 			const contentType = headResponse.headers.get('content-type') || '';
 			if (contentType.includes('application/pdf')) {
 				return extractPdfPageContent(tabUrl);
 			}
 		} catch {
-			// HEAD request failed, proceed with normal extraction
+			// HEAD request failed or timed out, proceed with normal extraction
 		}
 	}
 

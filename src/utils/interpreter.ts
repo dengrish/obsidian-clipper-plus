@@ -52,6 +52,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 		};
 
 		const maxOutputTokens = 16384;
+		const geminiMaxOutputTokens = 65536;
 
 		if (provider.name.toLowerCase().includes('hugging')) {
 			// Replace {model-id} in baseUrl with the actual model ID
@@ -150,7 +151,7 @@ export async function sendToLLM(promptContext: string, content: string, promptVa
 					{ role: 'user', content: `${promptContext}` },
 					{ role: 'user', content: `${JSON.stringify(promptContent)}` }
 				],
-				max_tokens: 65536
+				max_tokens: geminiMaxOutputTokens
 			};
 			headers = {
 				...headers,
