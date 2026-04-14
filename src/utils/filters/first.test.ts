@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { first } from './first';
 
 describe('first filter', () => {
@@ -27,6 +27,19 @@ describe('first filter', () => {
 		// Object.toString() returns "[object Object]"
 		const result = first('[{"a":1},{"b":2}]');
 		expect(result).toBe('[object Object]');
+	});
+
+	test('does not log errors for plain (non-JSON) strings', () => {
+		// Regression: previously first() called JSON.parse on any non-empty
+		// input, which spammed console.error when given a plain string.
+		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			expect(first('hello')).toBe('hello');
+			expect(first('not-an-array')).toBe('not-an-array');
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			spy.mockRestore();
+		}
 	});
 });
 
