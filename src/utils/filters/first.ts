@@ -4,6 +4,12 @@ export const first = (str: string): string => {
 		return str;
 	}
 
+	// Only attempt JSON parse if the input looks like a JSON array.
+	// This avoids noisy console errors when called on plain strings.
+	if (!str.startsWith('[')) {
+		return str;
+	}
+
 	try {
 		const array = JSON.parse(str);
 		if (Array.isArray(array) && array.length > 0) {

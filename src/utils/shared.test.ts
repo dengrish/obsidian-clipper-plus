@@ -379,6 +379,17 @@ describe('generateFrontmatter', () => {
 		]);
 		expect(result).toContain('quote: "she said \\"hello\\""');
 	});
+
+	test('trims leading/trailing whitespace from property names', () => {
+		// Regression: previously the trimmed name was used for the needs-quotes
+		// check but the untrimmed name was emitted, producing YAML keys with
+		// stray interior whitespace.
+		const result = generateFrontmatter([
+			{ name: '  tag  ', value: 'val' },
+		]);
+		expect(result).toContain('tag: "val"');
+		expect(result).not.toContain('  tag  ');
+	});
 });
 
 // ---------------------------------------------------------------------------

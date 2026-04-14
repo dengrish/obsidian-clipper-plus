@@ -153,10 +153,10 @@ export function generateFrontmatter(
 			|| /^\d/.test(trimmedName)
 			|| /^(true|false|null|yes|no|on|off)$/i.test(trimmedName);
 		const propertyKey = needsQuotes
-			? (property.name.includes('"')
-				? `'${property.name.replace(/'/g, "''")}'`
-				: `"${property.name}"`)
-			: property.name;
+			? (trimmedName.includes('"')
+				? `'${trimmedName.replace(/'/g, "''")}'`
+				: `"${trimmedName}"`)
+			: trimmedName;
 		frontmatter += `${propertyKey}:`;
 
 		const propertyType = propertyTypes[property.name] || 'text';

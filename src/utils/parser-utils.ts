@@ -36,8 +36,17 @@ export function processCharacter(char: string, state: ParserState): void {
 	}
 
 	if ((char === '"' || char === "'") && !state.inRegex) {
-		state.inQuote = !state.inQuote;
-		state.quoteType = state.inQuote ? char : '';
+		if (state.inQuote) {
+			// Only close the quote if it matches the opening quote type.
+			// Otherwise treat this character as literal content of the string.
+			if (char === state.quoteType) {
+				state.inQuote = false;
+				state.quoteType = '';
+			}
+		} else {
+			state.inQuote = true;
+			state.quoteType = char;
+		}
 		state.current += char;
 		return;
 	}
